@@ -2296,13 +2296,15 @@ export function mountEmbeddedBrowser(instance, options = {}) {
       (event.key==='ArrowUp'||event.key==='ArrowDown')&&elementOf(event.target)?.localName!=='input';
   }
   // Return in a single-line text field submits it, as in SwiftUI: the `.onSubmit` of the field or of a view around it
-  // runs (`TextField(onCommit:)` too). The DOM raises `submit` only for a field inside a <form>, which keeps that path;
-  // a field outside any form is submitted here. `.onSubmit(of:)` says which fields it takes: a search field submits
-  // `.search` (`data-submit-triggers` bit 4), any other field `.text` (bit 1).
+  // runs (`TextField(onCommit:)` too). Every field is submitted here, a field inside a <form> (a `Form`) too: the DOM's
+  // implicit submission targets the <form>, not the field's `.onSubmit`, and is skipped altogether when the form has
+  // several text fields and no submit button (an email and a password field), so the keydown cancels it.
+  // `.onSubmit(of:)` says which fields it takes: a search field submits `.search` (`data-submit-triggers` bit 4), any
+  // other field `.text` (bit 1).
   function submitsField(event){
     if (event.key!=='Enter' || event.isComposing || event.repeat || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
     const field=textEditorOf(event.target);
-    if (field?.localName!=='input' || field.form) return false;
+    if (field?.localName!=='input') return false;
     const owner=handler(field,'submit');
     if (!owner) return false;
     const triggers=owner.getAttribute('data-submit-triggers');
@@ -3690,7 +3692,7 @@ export function mountEmbeddedBrowser(instance, options = {}) {
   listen(root,'keydown',event=>{
     const target=elementOf(event.target);
     if (dispatchKeyPress(event,event.repeat?'repeat':'down')) return;
-    if (submitsField(event)) fire(event,'submit');
+    if (submitsField(event)) { if (textEditorOf(event.target)?.form) event.preventDefault(); fire(event,'submit'); }
     if ([' ','Enter'].includes(event.key) && !event.repeat) { const button=pressable(target); if (button && button===target) { pressedButton=button; setPressed(button,true); } }
     const keyOwner=namedEventOwner(target,'keyDown');
     if (keyOwner) {
